@@ -33,7 +33,7 @@ function *(a::Vector, b::Real)
 end
 
 function magnitude(a::Vector)
-	return sqrt(a.x ^ 2, a.y ^ 2, a.z ^ 2)
+	return sqrt(a.x ^ 2 + a.y ^ 2 + a.z ^ 2)
 end
 
 function normal(a::Vector)
