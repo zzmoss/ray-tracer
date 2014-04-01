@@ -1,7 +1,6 @@
 include("vector.jl")
 import Images
 import ImageView
-import Tk
 
 type Ray
 	origin::Vector
@@ -47,13 +46,15 @@ end
 
 
 ## Method to calculate Intersection of a ray on a plane ##
+## See http://geomalgorithms.com/a06-_intersect-2.html for algorithm ##
 function intersection(p::Plane, l::Ray)
 	v = dot(l.direction, p.normal)
 	if v == 0
 		return Intersection(Vector(), -1, Vector(), p)
 	else
-		d = dot(p.point - l.origin, p.normal) / v
-		return Intersection (l.origin + (l.direction * d), d, p.normal, p)
+		distance = dot(p.point - l.origin, p.normal) / v
+		point = l.origin + (l.direction * distance)
+		return Intersection (point, distance, normal(p.point) , p)
 	end
 end
 
@@ -73,6 +74,7 @@ function findIntersection(r::Ray, objects, ignore=nothing)
 end
 
 function findColor(l::Ray, intersect, lightSource)
+
 	shade = dot(intersect.normal, normal(intersect.point - lightSource))
 	if(shade <= 0)
 		shade = 0
@@ -83,9 +85,11 @@ end
 
 function traceRay(l::Ray, lightSource, objects)
 	intersect = findIntersection(l, objects)
+	#println(intersect.object)
 	if intersect.object == nothing
 		return Vector(255, 255, 255) 
 	end
+	#println(findColor(l, intersect, lightSource))
 	return findColor(l, intersect, lightSource)
 end
 
@@ -98,10 +102,10 @@ cameraPos = Vector(0,0,20)
 s1 = Sphere( Vector(4,4,-10), 2, Vector(0,255,0))
 s2 = Sphere( Vector(8,2,-10), 1, Vector(255,0,0))
 s3 = Sphere( Vector(4,6,-10), 3, Vector(0,0,255))
-p = Plane( Vector(0,0,-12), Vector(0,0,1), Vector(200,200,200))
+p = Plane( Vector(0,0,-12), Vector(0,0,1), Vector(0,255,255))
 objects = [s1, s2, s3, p]
 
-arSize = 500
+arSize = 200
 imArray = fill(0xff, (3, arSize, arSize))
 imProperties = {"colordim" => 1, "colorspace" => "RGB", "spatialorder" => ["x","y"], "limits" => (0x00,0xff)}
 
@@ -111,6 +115,7 @@ for i in 1:arSize
 	for j in 1:arSize
 		ray = Ray(cameraPos, normal(Vector(i/45, j/45, 0) - cameraPos))
 		col = traceRay(ray, lightSource, objects)
+		#println(col)
 		imArray[1, i, j] = uint8(col.x)
 		imArray[2, i, j] = uint8(col.y)
 		imArray[3, i, j] = uint8(col.z)
