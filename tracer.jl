@@ -76,6 +76,7 @@ function findColor(l::Ray, intersect, lightSource)
 	shade = dot(intersect.normal, normal(intersect.point - lightSource))
 	if(shade <= 0)
 		shade = 0
+		return Vector(255, 255, 255) * AMBIENT
 	end
 	return intersect.object.color * (1 - AMBIENT) * shade
 end
@@ -94,27 +95,26 @@ cameraPos = Vector(0,0,20)
 
 
 ## Define objects ##
-s1 = Sphere( Vector(-2,0,-10), 2, Vector(0,255,0))
-s2 = Sphere( Vector(2,0,-10), 3.5, Vector(255,0,0))
-s3 = Sphere( Vector(0,-4,-10), 3, Vector(0,0,255))
-p = Plane( Vector(0,0,-12), Vector(0,0,1), Vector(255,255,255))
+s1 = Sphere( Vector(4,4,-10), 2, Vector(0,255,0))
+s2 = Sphere( Vector(8,2,-10), 1, Vector(255,0,0))
+s3 = Sphere( Vector(4,6,-10), 3, Vector(0,0,255))
+p = Plane( Vector(0,0,-12), Vector(0,0,1), Vector(200,200,200))
 objects = [s1, s2, s3, p]
-#objects = [p]
 
-img = Images.imread("test.png")
 arSize = 500
 imArray = fill(0xff, (3, arSize, arSize))
+imProperties = {"colordim" => 1, "colorspace" => "RGB", "spatialorder" => ["x","y"], "limits" => (0x00,0xff)}
 
+img = Images.Image(imArray, imProperties)
 
 for i in 1:arSize
 	for j in 1:arSize
 		ray = Ray(cameraPos, normal(Vector(i/45, j/45, 0) - cameraPos))
-		#println(ray)
 		col = traceRay(ray, lightSource, objects)
-		##println(col)
-		imArray[1, arSize+1-j, i] = uint8(col.x)
-		imArray[2, arSize+1-j, i] = uint8(col.y)
-		imArray[3, arSize+1-j, i] = uint8(col.z)
+		imArray[1, i, j] = uint8(col.x)
+		imArray[2, i, j] = uint8(col.y)
+		imArray[3, i, j] = uint8(col.z)
+
 	end
 end
 
