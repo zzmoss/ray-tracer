@@ -1,27 +1,10 @@
 include("vector.jl")
+include("types.jl")
+include("properties.jl")
 import Images
-import ImageView
-
-type Ray
-	origin::Vector
-	direction::Vector
-end
-
-type Sphere
-	center::Vector
-	radius::Real
-	color::Vector
-end
-
-type Intersection
-	point::Vector
-	distance::Real
-	normal::Vector
-	object
-end
 
 ## Constants ##
-AMBIENT = 0.1
+AMBIENT = get(rayTracerProperties, "ambient", 0.1)
 
 ## Method to calculate the Intersection of a ray on a sphere ##
 function intersection(s::Sphere, l::Ray)
@@ -59,7 +42,19 @@ function findIntersection(r::Ray, objects, ignore=nothing)
 	return intersect
 end
 
-function findColor(l::Ray, intersect, lightSource)
+function blinnPhongShadeColor(l::Ray, intersect, lightSource, camera)
+	n = intersect.normal
+	l = normal(intersect.point - lightSource)
+	v = normal(intersect.point - camera)
+	h = (v + l) * (1 / magnitude(v + l))
+	kSpecular = get(rayTracerProperties, "specular", Vector())
+	kDiffuse = intersect.object.color
+	I = 1 - AMBIENT
+
+	return (kDiffuse * I * max(0, dot(n, l))) + (kSpecular * I * max(0, dot(n, h)))
+end
+
+function lambertShadeColor(l::Ray, intersect, lightSource)
 	shade = dot(intersect.normal, normal(intersect.point - lightSource))
 	if(shade <= 0)
 		shade = 0
@@ -77,47 +72,55 @@ end
 
 function traceRayRecursive(l::Ray, lightSource, intersect, recDepth)
 	if recDepth > 0
-		pointColor = findColor(l, intersect, lightSource)
+		pointColor = lambertShadeColor(l, intersect, lightSource)
 		reflectedColor =  traceRayRecursive(getReflectedRay(l, intersect), lightSource, intersect, recDepth - 1)
 	else
 		return pointColor + reflectedColor
 	end	
 end
 
-function traceRay(l::Ray, lightSource, objects)
+function traceRay(l::Ray, lightSource, objects, cameraPos)
 	intersect = findIntersection(l, objects)
 	if intersect.object == nothing
 		return Vector(255, 255, 255) * AMBIENT 
 	end
-	return findColor(l, intersect, lightSource)
+	#return lambertShadeColor(l, intersect, lightSource)
+	return blinnPhongShadeColor(l, intersect, lightSource, cameraPos)
 end
 
 
-## Define Lights and Camera ##
-lightSource = Vector(0, 0, -120)
-cameraPos = Vector(0,0,30)
-
-
-## Define objects ##
-s1 = Sphere( Vector(4,4,-10), 2, Vector(200,255,0))
-s2 = Sphere( Vector(2,8,-10), 1, Vector(220,0,100))
-s3 = Sphere( Vector(10,4,-10), 3, Vector(0,100,205))
-objects = [s1, s2, s3]
-imArray = fill(0xe5, (3, arSize, arSize))
-imProperties = {"colordim" => 1, "colorspace" => "RGB", "spatialorder" => ["x","y"], "limits" => (0x00,0xff)}
-
-img = Images.Image(imArray, imProperties)
-
-for i in 1:arSize
-	for j in 1:arSize
-		ray = Ray(cameraPos, normal(Vector((i-0.5)/45, (j-0.5)/45, 0) - cameraPos))
-		col = traceRay(ray, lightSource, objects)
-		#println(col)
-		imArray[1, i, j] = uint8(col.x)
-		imArray[2, i, j] = uint8(col.y)
-		imArray[3, i, j] = uint8(col.z)
-
-	end
+function traceWorker(i, j, imageArray, cameraPos, lightSource, objects)
+	ray = Ray(cameraPos, normal(Vector((i-0.5)/45, (j-0.5)/45, 0) - cameraPos))
+	col = traceRay(ray, lightSource, objects, cameraPos)
+	imageArray[1, i, j] = uint8(col.x)
+	imageArray[2, i, j] = uint8(col.y)
+	imageArray[3, i, j] = uint8(col.z)
 end
 
-img.data = imArray
+function render()
+	
+	## Read from properties ##
+	rtp = rayTracerProperties
+	lightSource = get(rtp, "lightSource", Vector())
+	cameraPos = get(rtp, "cameraPos", Vector())
+	objects = get(rtp, "objects", nothing)
+	imageWidth = get(rtp, "imageWidth", 0)
+	imageHeight = get(rtp, "imageHeight", 0)
+	pixelWidth = get(rtp, "pixelWidth", 0)
+	imageProperties = get(rtp, "imageProperties", nothing)
+
+	## Setup image array ##
+	imageArray = fill(0x00, (3, imageWidth, imageHeight))
+
+	## Initialize the image ##
+	image = Images.Image(imageArray, imageProperties)
+
+	## ImageArray is by reference, will be mutated in traceWorker :( ##
+	@parallel for x in 1:imageWidth, y in 1:imageHeight
+			traceWorker(x, y, imageArray, cameraPos, lightSource, objects) 
+		end
+	image.data = imageArray
+	return image
+
+end
+finalImage = render()
