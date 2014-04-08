@@ -63,22 +63,6 @@ function lambertShadeColor(l::Ray, intersect, lightSource)
 	return intersect.object.color * (1 - AMBIENT) * shade
 end
 
-function getReflectedRay(l::Ray, intersect)
-	rayDir = l.direction
-	normal = intersect.object.normal
-	c1 = -dot(rayDir, normal)
-	return rayDir + ( rayDir * ( 2 * c1) ) 
-end
-
-function traceRayRecursive(l::Ray, lightSource, intersect, recDepth)
-	if recDepth > 0
-		pointColor = lambertShadeColor(l, intersect, lightSource)
-		reflectedColor =  traceRayRecursive(getReflectedRay(l, intersect), lightSource, intersect, recDepth - 1)
-	else
-		return pointColor + reflectedColor
-	end	
-end
-
 function traceRay(l::Ray, lightSource, objects, cameraPos)
 	intersect = findIntersection(l, objects)
 	if intersect.object == nothing
